@@ -28,7 +28,7 @@ export default function Home() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Parse Supabase Key logic inside functions to avoid cascading errors
-  const hasSupabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "placeholder" && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY_HERE";
+  const hasSupabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY !== "placeholder" && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY !== "YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
 
   const handleSessionEnd = useCallback(async () => {
     setIsRunning(false);
