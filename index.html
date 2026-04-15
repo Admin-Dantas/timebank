@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeBank Premium</title>
+    
+    <!-- Tailwind setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0b1a2f, #1e2a3a);
+            color: #e5e7eb;
+            transition: background 1.2s ease;
+            min-height: 100vh;
+        }
+
+        body.timer-active {
+            animation: softPulse 8s infinite alternate ease-in-out;
+        }
+
+        @keyframes softPulse {
+            0% { filter: brightness(1); }
+            100% { filter: brightness(1.1); }
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 24px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .category-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .category-card:hover {
+            background: rgba(255,255,255,0.06);
+        }
+        .category-card.selected {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+        }
+        
+        /* Hide scrollbar for lists */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+        .btn-arrow {
+            padding: 8px;
+            opacity: 0.4;
+            transition: 0.2s;
+        }
+        .btn-arrow:hover {
+            opacity: 1;
+            transform: scale(1.1);
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        
+        .color-btn {
+            transition: all 0.2s;
+        }
+        .color-btn.active {
+            transform: scale(1.2);
+            box-shadow: 0 0 10px currentColor;
+            border: 2px solid #fff;
+        }
+
+        .delete-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .group:hover .delete-btn {
+            opacity: 0.4;
+        }
+        .delete-btn:hover {
+            opacity: 1 !important;
+            color: #ef4444;
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked { right: 0; border-color: #34d399; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #34d399; }
+    </style>
+</head>
+<body class="py-12 px-6">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- HEADER -->
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-10">
+            <h1 class="text-3xl font-light tracking-widest uppercase opacity-80 mb-6 sm:mb-0">Time<span class="font-semibold text-emerald-400">Bank</span></h1>
+            
+            <div class="flex flex-col items-center sm:items-end w-full sm:w-auto">
+                <div class="text-center sm:text-right">
+                    <p class="text-[0.65rem] uppercase tracking-[0.2em] opacity-50 mb-1">Total Banked</p>
+                    <div id="total-time" class="font-mono text-3xl font-light tracking-wider">00:00:00</div>
+                </div>
+                
+                <!-- PROGRESS BAR: Daily Goal -->
+                <div class="mt-4 flex flex-col items-center sm:items-end w-full sm:w-[200px]">
+                    <div class="flex justify-between w-full mb-1">
+                        <span class="text-[0.6rem] uppercase tracking-wider opacity-50 flex items-center gap-1">⏱️ Daily Goal</span>
+                        <span class="text-[0.6rem] uppercase tracking-wider opacity-70" id="daily-progress-text">0h / 4h</span>
+                    </div>
+                    <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        <div id="daily-progress-bar" class="h-full bg-emerald-400 transition-all duration-1000 shadow-[0_0_10px_#34d399]" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- LEFT COLUMN: Timer & Controls -->
+            <div class="lg:col-span-2 space-y-8 flex flex-col">
+                
+                <!-- Main Timer Card -->
+                <div class="glass-card p-10 flex flex-col items-center relative overflow-hidden flex-grow">
+                    <!-- Audio Toggle -->
+                    <div class="absolute top-6 right-6 flex items-center gap-2 opacity-50 hover:opacity-100 transition cursor-pointer" onclick="toggleAudioOption()">
+                        <span class="text-[0.6rem] uppercase tracking-wider" id="audio-label">Soundscapes Off</span>
+                        <div class="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" id="audio-toggle" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 border-slate-700 appearance-none cursor-pointer pointer-events-none"/>
+                            <label class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-700 cursor-pointer pointer-events-none"></label>
+                        </div>
+                    </div>
+
+                    <!-- Task Input -->
+                    <input id="task-name" type="text" placeholder="What are you focusing on?" 
+                           class="w-full max-w-lg bg-transparent border-b border-white/10 focus:border-emerald-400/50 text-xl py-3 outline-none text-center transition-colors mb-8 mt-4 placeholder-white/20 font-light">
+
+                    <!-- Timer Digits -->
+                    <div class="flex items-center gap-6 sm:gap-8 mb-10 font-light select-none">
+                        <div class="flex flex-col items-center">
+                            <button onclick="adjustTime('h', 1)" class="btn-arrow">▲</button>
+                            <div id="h-display" class="text-6xl sm:text-8xl tabular-nums tracking-tight">00</div>
+                            <button onclick="adjustTime('h', -1)" class="btn-arrow">▼</button>
+                        </div>
+                        <div class="text-4xl sm:text-6xl opacity-20 relative -top-3">:</div>
+                        <div class="flex flex-col items-center">
+                            <button onclick="adjustTime('m', 1)" class="btn-arrow">▲</button>
+                            <div id="m-display" class="text-6xl sm:text-8xl tabular-nums tracking-tight">30</div>
+                            <button onclick="adjustTime('m', -1)" class="btn-arrow">▼</button>
+                        </div>
+                        <div class="text-4xl sm:text-6xl opacity-20 relative -top-3">:</div>
+                        <div class="flex flex-col items-center">
+                            <button onclick="adjustTime('s', 1)" class="btn-arrow">▲</button>
+                            <div id="s-display" class="text-6xl sm:text-8xl tabular-nums tracking-tight">00</div>
+                            <button onclick="adjustTime('s', -1)" class="btn-arrow">▼</button>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full sm:w-auto">
+                        <button onclick="toggleTimer()" id="start-btn" 
+                                class="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-green-400 text-slate-900 px-14 py-4 rounded-2xl font-semibold tracking-widest uppercase hover:brightness-110 transition shadow-[0_0_20px_rgba(52,211,153,0.3)]">
+                            Iniciar
+                        </button>
+                        <button onclick="resetTimer()" 
+                                class="w-full sm:w-auto px-8 py-4 rounded-2xl border border-white/10 hover:bg-white/5 transition tracking-widest uppercase text-xs text-opacity-80">
+                            Reset
+                        </button>
+                    </div>
+
+                    <!-- Quick Add -->
+                    <div class="mt-12 flex flex-wrap justify-center gap-3">
+                        <span class="text-[0.65rem] uppercase tracking-widest opacity-40 self-center mr-2">Quick Add:</span>
+                        <button onclick="quickAdd(5)" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs transition">+5m</button>
+                        <button onclick="quickAdd(15)" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs transition">+15m</button>
+                        <button onclick="quickAdd(30)" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs transition">+30m</button>
+                        <button onclick="quickAdd(60)" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs transition">+1h</button>
+                    </div>
+                </div>
+
+                <!-- History List -->
+                <div class="glass-card p-8 h-[280px] flex flex-col">
+                    <div class="flex justify-between items-center mb-5">
+                        <h2 class="text-[0.7rem] uppercase tracking-widest opacity-50">History Log</h2>
+                        <button onclick="clearHistory()" class="text-[0.6rem] uppercase tracking-widest opacity-30 hover:opacity-100 hover:text-red-400 transition">Clear All</button>
+                    </div>
+                    <div id="history-container" class="space-y-3 overflow-y-auto flex-grow pr-2">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Categories & Stats -->
+            <div class="space-y-8 flex flex-col">
+                
+                <!-- Categories Card -->
+                <div class="glass-card p-8 flex flex-col max-h-[400px]">
+                    <div class="flex justify-between items-center mb-5">
+                        <h2 class="text-[0.7rem] uppercase tracking-widest opacity-50">Focus Categories</h2>
+                    </div>
+
+                    <div id="categories-container" class="space-y-2 overflow-y-auto flex-grow pr-2 mb-4">
+                        <!-- Populated via JS -->
+                    </div>
+
+                    <!-- Add New Category -->
+                    <div class="pt-4 border-t border-white/5 mt-auto">
+                        <input id="cat-name" type="text" placeholder="Nome da categoria..." 
+                               class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-400/50 mb-3 transition">
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex gap-2" id="color-picker">
+                                <button onclick="selectColor('#34d399')" class="color-btn active w-5 h-5 sm:w-6 sm:h-6 rounded-full cursor-pointer" style="background:#34d399;"></button>
+                                <button onclick="selectColor('#60a5fa')" class="color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full cursor-pointer" style="background:#60a5fa;"></button>
+                                <button onclick="selectColor('#c084fc')" class="color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full cursor-pointer" style="background:#c084fc;"></button>
+                                <button onclick="selectColor('#fb923c')" class="color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full cursor-pointer" style="background:#fb923c;"></button>
+                                <button onclick="selectColor('#f43f5e')" class="color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full cursor-pointer" style="background:#f43f5e;"></button>
+                            </div>
+                            <button onclick="addCategory()" class="text-[0.7rem] sm:text-xs tracking-wider uppercase bg-white/5 hover:bg-white/15 px-3 sm:px-4 py-2.5 rounded-lg transition">+ Add</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Card -->
+                <div class="glass-card p-8 flex-grow flex flex-col">
+                    <h2 class="text-[0.7rem] uppercase tracking-widest opacity-50 mb-4">Time Distribution</h2>
+                    <div class="relative w-full flex-grow min-h-[180px] flex items-center justify-center">
+                        <canvas id="timeChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- PURE VANILLA JAVASCRIPT LOGIC -->
+    <script>
+        // --- State Management ---
+        let state = {
+            categories: [
+                { id: 1, name: "Work / Focus", color: "#60a5fa", totalSeconds: 0 },
+                { id: 2, name: "Learning", color: "#c084fc", totalSeconds: 0 }
+            ],
+            history: [], // { id, taskName, catId, date, durationSecs }
+            selectedCategoryId: 1,
+            dailyGoalHours: 4,
+            useAudio: false
+        };
+
+        const STORAGE_KEY = 'timebank_premium_v2';
+        let newCatColor = '#34d399';
+        
+        let T_h = 0, T_m = 30, T_s = 0;
+        let initialSessionSecs = 0;
+        let isRunning = false;
+        let interval = null;
+        let myChart = null;
+        
+        // Audio Vars
+        let audioCtx = null;
+        let noiseNode = null;
+        let noiseGain = null;
+
+        // --- Init ---
+        function initApp() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if(saved) {
+                try { 
+                    const parsed = JSON.parse(saved); 
+                    if(parsed.categories && parsed.history) { state = parsed; }
+                } catch(e) {}
+            }
+            if(!state.dailyGoalHours) state.dailyGoalHours = 4;
+            
+            // Sync Audio Toggle UI
+            document.getElementById('audio-toggle').checked = state.useAudio;
+            document.getElementById('audio-label').innerText = state.useAudio ? "Soundscapes On" : "Soundscapes Off";
+
+            renderUI();
+        }
+
+        function saveState() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            updateCharts();
+            renderHistory();
+            updateTotalBanked();
+            renderCategories();
+            updateDailyGoal();
+        }
+
+        // --- Audio System & Soundscapes ---
+        function toggleAudioOption() {
+            state.useAudio = !state.useAudio;
+            document.getElementById('audio-toggle').checked = state.useAudio;
+            document.getElementById('audio-label').innerText = state.useAudio ? "Soundscapes On" : "Soundscapes Off";
+            saveState();
+        }
+
+        function playDing() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if(!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 1.5);
+            } catch(e) {}
+        }
+
+        function startAmbientNoise() {
+            if(!state.useAudio) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                const bufferSize = audioCtx.sampleRate * 2; 
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = buffer.getChannelData(0);
+                
+                // Deep Brown Noise generation for focus
+                let lastOut = 0;
+                for (let i = 0; i < bufferSize; i++) {
+                    let white = Math.random() * 2 - 1;
+                    output[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = output[i];
+                    output[i] *= 3.5; // Compensate for volume drop
+                }
+                
+                noiseNode = audioCtx.createBufferSource();
+                noiseNode.buffer = buffer;
+                noiseNode.loop = true;
+                
+                noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                noiseGain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 2); // Soft volume fade in
+                
+                noiseNode.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                noiseNode.start();
+            } catch(e) { console.log('Audio error:', e); }
+        }
+
+        function stopAmbientNoise() {
+            if (noiseGain) {
+                noiseGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+                setTimeout(() => { 
+                    if (noiseNode) { noiseNode.stop(); noiseNode.disconnect(); noiseNode = null; } 
+                }, 1000);
+            }
+        }
+
+        // --- Timer Controls ---
+        function updateTimerDisplay() {
+            document.getElementById('h-display').innerText = String(T_h).padStart(2,'0');
+            document.getElementById('m-display').innerText = String(T_m).padStart(2,'0');
+            document.getElementById('s-display').innerText = String(T_s).padStart(2,'0');
+        }
+
+        function adjustTime(type, val) {
+            if(isRunning) return;
+            if(type === 'h') T_h = Math.max(0, T_h + val);
+            if(type === 'm') T_m = Math.max(0, Math.min(59, T_m + val));
+            if(type === 's') T_s = Math.max(0, Math.min(59, T_s + val));
+            updateTimerDisplay();
+        }
+
+        function quickAdd(min) {
+            if(isRunning) return;
+            let total = T_h * 60 + T_m + min;
+            T_h = Math.floor(total / 60);
+            T_m = total % 60;
+            updateTimerDisplay();
+        }
+
+        function toggleTimer() {
+            const btn = document.getElementById('start-btn');
+            if(!isRunning) {
+                // START
+                let totalSecs = T_h*3600 + T_m*60 + T_s;
+                if(totalSecs === 0) return;
+                
+                initialSessionSecs = totalSecs;
+                isRunning = true;
+                btn.innerText = "PAUSAR";
+                document.body.classList.add('timer-active');
+                
+                startAmbientNoise();
+                
+                interval = setInterval(() => {
+                    if(T_h === 0 && T_m === 0 && T_s === 0) {
+                        endSession(initialSessionSecs);
+                        return;
+                    }
+                    if(T_s === 0) {
+                        if(T_m === 0) { T_h--; T_m=59; T_s=59; } 
+                        else { T_m--; T_s=59; }
+                    } else {
+                        T_s--;
+                    }
+                    updateTimerDisplay();
+                }, 1000);
+
+            } else {
+                // PAUSE
+                clearInterval(interval);
+                isRunning = false;
+                btn.innerText = "RETOMAR";
+                document.body.classList.remove('timer-active');
+                stopAmbientNoise();
+            }
+        }
+
+        function resetTimer() {
+            if(isRunning) toggleTimer(); // pause first
+            T_h = 0; T_m = 30; T_s = 0;
+            document.getElementById('start-btn').innerText = "INICIAR";
+            updateTimerDisplay();
+        }
+
+        function endSession(durationCompleted) {
+            clearInterval(interval);
+            isRunning = false;
+            document.body.classList.remove('timer-active');
+            document.getElementById('start-btn').innerText = "INICIAR";
+            
+            stopAmbientNoise();
+            playDing();
+            
+            // Save logic
+            let taskInput = document.getElementById('task-name').value.trim();
+            if(!taskInput) taskInput = "Deep Work Session";
+            
+            // Update Category
+            let cat = state.categories.find(c => c.id === state.selectedCategoryId);
+            if(!cat) {
+                cat = state.categories[0];
+                state.selectedCategoryId = cat.id;
+            }
+            cat.totalSeconds += durationCompleted;
+            
+            // Add to history
+            state.history.unshift({
+                id: Date.now(),
+                taskName: taskInput,
+                catId: cat.id,
+                durationSecs: durationCompleted,
+                date: new Date().toISOString()
+            });
+
+            if(state.history.length > 100) state.history.pop();
+            
+            document.getElementById('task-name').value = '';
+            resetTimer();
+            saveState();
+        }
+
+        // --- Categories ---
+        function selectCategory(id) {
+            state.selectedCategoryId = id;
+            renderCategories();
+            saveState();
+        }
+
+        function selectColor(hex) {
+            newCatColor = hex;
+            document.querySelectorAll('.color-btn').forEach(b => {
+                b.classList.toggle('active', b.style.backgroundColor === hex || b.style.backgroundColor === hexToRgb(hex));
+            });
+        }
+        
+        function hexToRgb(hex) {
+            let r = parseInt(hex.slice(1,3), 16);
+            let g = parseInt(hex.slice(3,5), 16);
+            let b = parseInt(hex.slice(5,7), 16);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function addCategory() {
+            const nameEl = document.getElementById('cat-name');
+            const name = nameEl.value.trim();
+            if(!name) return;
+            
+            const newId = Date.now();
+            state.categories.push({ id: newId, name: name, color: newCatColor, totalSeconds: 0 });
+            state.selectedCategoryId = newId;
+            nameEl.value = '';
+            saveState();
+        }
+
+        function deleteCategory(id, e) {
+            e.stopPropagation();
+            if(state.categories.length <= 1) {
+                alert("You need at least one category to track your time!");
+                return;
+            }
+            if(confirm("Delete this category? Your past history won't be deleted, but you won't see this category in the list anymore.")) {
+                state.categories = state.categories.filter(c => c.id !== id);
+                if(state.selectedCategoryId === id) {
+                    state.selectedCategoryId = state.categories[0].id;
+                }
+                saveState();
+            }
+        }
+
+        // --- History ---
+        function deleteHistory(id) {
+            if(confirm("Remove this entry from your history? (This will also subtract the banked time)")) {
+                const entry = state.history.find(h => h.id === id);
+                if(entry) {
+                    const cat = state.categories.find(c => c.id === entry.catId);
+                    if(cat) cat.totalSeconds = Math.max(0, cat.totalSeconds - entry.durationSecs);
+                }
+                state.history = state.history.filter(h => h.id !== id);
+                saveState();
+            }
+        }
+
+        function clearHistory() {
+            if(state.history.length === 0) return;
+            if(confirm("Are you sure you want to completely erase ALL your history and reset your banked time to zero?")) {
+                state.history = [];
+                state.categories.forEach(c => c.totalSeconds = 0);
+                saveState();
+            }
+        }
+
+        // --- Render UI ---
+        function renderCategories() {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = state.categories.map(c => `
+                <div onclick="selectCategory(${c.id})" class="group category-card rounded-xl p-3 flex justify-between items-center ${c.id === state.selectedCategoryId ? 'selected' : ''}">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="min-w-[12px] h-3 rounded-full shadow-[0_0_8px_${c.color}]" style="background:${c.color}"></div>
+                        <span class="text-sm tracking-wide truncate">${c.name}</span>
+                    </div>
+                    <button onclick="deleteCategory(${c.id}, event)" class="delete-btn text-xs px-2 py-1" title="Delete category">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function formatHMS(totalSecs, short = false) {
+            const h = Math.floor(totalSecs / 3600);
+            const m = Math.floor((totalSecs % 3600) / 60);
+            const s = totalSecs % 60;
+            if (short && h === 0) return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('history-container');
+            if(state.history.length === 0) {
+                container.innerHTML = `<div class="opacity-30 text-xs tracking-widest uppercase italic text-center mt-10">No sessions yet</div>`;
+                return;
+            }
+            container.innerHTML = state.history.map(h => {
+                const cat = state.categories.find(c => c.id === h.catId) || { name: "Deleted Category", color: "#666" };
+                const dateObj = new Date(h.date);
+                const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return `
+                <div class="group flex justify-between items-center bg-black/10 rounded-xl p-3 border border-white/5 hover:border-white/10 transition">
+                    <div class="flex items-center gap-4 overflow-hidden">
+                        <div class="w-1.5 h-1.5 rounded-full min-w-[6px]" style="background:${cat.color}"></div>
+                        <div class="flex flex-col overflow-hidden">
+                            <span class="text-[0.8rem] font-medium truncate w-[120px] sm:w-[200px]" title="${h.taskName}">${h.taskName}</span>
+                            <span class="text-[0.6rem] opacity-50 uppercase tracking-widest">${timeStr} • ${cat.name}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-xs font-mono text-emerald-300 bg-emerald-400/10 px-2 py-1 rounded">
+                            +${formatHMS(h.durationSecs, true)}
+                        </div>
+                        <button onclick="deleteHistory(${h.id})" class="delete-btn text-xs px-1" title="Remove Entry">✕</button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function updateTotalBanked() {
+            const total = state.categories.reduce((acc, c) => acc + c.totalSeconds, 0);
+            document.getElementById('total-time').innerText = formatHMS(total);
+        }
+
+        function updateDailyGoal() {
+            // Find total time banked today
+            const today = new Date().toLocaleDateString();
+            const todaySecs = state.history
+                .filter(h => new Date(h.date).toLocaleDateString() === today)
+                .reduce((acc, h) => acc + h.durationSecs, 0);
+            
+            const goalSecs = state.dailyGoalHours * 3600;
+            let percent = (todaySecs / goalSecs) * 100;
+            if(percent > 100) percent = 100;
+            
+            let hrs = (todaySecs / 3600).toFixed(1);
+            document.getElementById('daily-progress-text').innerText = `${hrs}h / ${state.dailyGoalHours}h`;
+            document.getElementById('daily-progress-bar').style.width = `${percent}%`;
+            
+            if(percent >= 100) {
+                document.getElementById('daily-progress-bar').classList.add('bg-yellow-400', 'shadow-[0_0_15px_#facc15]');
+                document.getElementById('daily-progress-bar').classList.remove('bg-emerald-400', 'shadow-[0_0_10px_#34d399]');
+            } else {
+                document.getElementById('daily-progress-bar').classList.add('bg-emerald-400', 'shadow-[0_0_10px_#34d399]');
+                document.getElementById('daily-progress-bar').classList.remove('bg-yellow-400', 'shadow-[0_0_15px_#facc15]');
+            }
+        }
+
+        function updateCharts() {
+            const canvas = document.getElementById('timeChart');
+            const data = state.categories.filter(c => c.totalSeconds > 0);
+            
+            // If all are zero, show an empty state logically
+            const labels = data.length ? data.map(c => c.name) : ['Ready to begin'];
+            const values = data.length ? data.map(c => c.totalSeconds / 60) : [1]; 
+            const colors = data.length ? data.map(c => c.color) : ['#ffffff11'];
+
+            if(myChart) myChart.destroy();
+            
+            myChart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    if(!data.length) return ' Start tracking!';
+                                    const mins = Math.round(ctx.raw);
+                                    const hrs = (mins / 60).toFixed(1);
+                                    if(mins < 60) return ` ${mins} mins`;
+                                    return ` ${hrs} hours`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderUI() {
+            updateTimerDisplay();
+            renderCategories();
+            renderHistory();
+            updateTotalBanked();
+            updateDailyGoal();
+            updateCharts();
+        }
+
+        // Start
+        window.addEventListener('load', initApp);
+
+    </script>
+</body>
+</html>
